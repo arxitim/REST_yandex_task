@@ -41,21 +41,54 @@ class ChangeData(View):
 
     """
     def patch(self, request, import_id, citizen_id):
-        all_citizens = json.loads(Import.objects.get(pk=import_id).value)['data']
+        patch_data = json.loads(request.body)
+
+        # берем нужный импорт
+        my_import = Import.objects.get(pk=import_id)
+
+        # из него берем нужных людей
+        all_citizens = json.loads(my_import.value)['data']
 
         # находим интересуещего нас жителя
         citizen = next(x for x in all_citizens if x['citizen_id'] == citizen_id)
 
-        print(all_citizens.index(citizen))
+        # собираемся его пропатчить
+        patch_citizen = all_citizens.pop(all_citizens.index(citizen))
 
-        patch_data = json.loads(request.body)
+        if (len(patch_data) == len(set(patch_data))) and set(patch_data).issubset({
+                                                                                    'name', 'gender', 'birth_date',
+                                                                                    'relatives', 'town',
+                                                                                    'street', 'building',
+                                                                                    'apartment'}):
+            # приступаем к патчингу
+            for key in patch_data:
+                if key == 'relatives':
+
+                    # если появились родственные связи
+                    if patch_data[key]:
+                        for relative in patch_data[key]:
+                            new_relative = next(x for x in all_citizens if x['citizen_id'] == relative)
+                            all_citizens[all_citizens.index(new_relative)][key].append(citizen_id)
+
+                    # если пропали
+                    else:
+                        for relative in patch_citizen['relatives']:
+                            new_relative = next(x for x in all_citizens if x['citizen_id'] == relative)
+                            all_citizens[all_citizens.index(new_relative)][key].remove(citizen_id)
+
+                patch_citizen[key] = patch_data[key]
+
+            # добавляем обратно в список жителей
+            all_citizens.append(patch_citizen)
+
+            # ну и сохраняем обратно в базу
+            my_import.value = json.dumps({"data": all_citizens}, ensure_ascii=False, indent=2)
+            my_import.save()
+
+        else:
+            return HttpResponse('Неверная инфа для PATCH', status=400)
 
         return HttpResponse('ok', status=200)
-
-    # test
-    def get(self, request, import_id, citizen_id):
-        return HttpResponse(f'Change data for {import_id}  {citizen_id}')
-
 
 # 3
 class GetData(View):
