@@ -8,7 +8,6 @@ import json
 
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
-# patch можно определить как метод класса все норм
 
 
 # 1
@@ -64,17 +63,16 @@ class ChangeData(View):
             for key in patch_data:
                 if key == 'relatives':
 
-                    # если появились родственные связи
+                    # удалить все существующие:
+                    for relative in patch_citizen['relatives']:
+                        new_relative = next(x for x in all_citizens if x['citizen_id'] == relative)
+                        all_citizens[all_citizens.index(new_relative)][key].remove(citizen_id)
+
+                    # если апдэйтнулись родственные связи
                     if patch_data[key]:
                         for relative in patch_data[key]:
                             new_relative = next(x for x in all_citizens if x['citizen_id'] == relative)
                             all_citizens[all_citizens.index(new_relative)][key].append(citizen_id)
-
-                    # если пропали
-                    else:
-                        for relative in patch_citizen['relatives']:
-                            new_relative = next(x for x in all_citizens if x['citizen_id'] == relative)
-                            all_citizens[all_citizens.index(new_relative)][key].remove(citizen_id)
 
                 patch_citizen[key] = patch_data[key]
 
@@ -82,13 +80,14 @@ class ChangeData(View):
             all_citizens.append(patch_citizen)
 
             # ну и сохраняем обратно в базу
-            my_import.value = json.dumps({"data": all_citizens}, ensure_ascii=False, indent=2)
+            my_import.value = json.dumps({"data": all_citizens}, ensure_ascii=False, indent=4)
             my_import.save()
 
         else:
             return HttpResponse('Неверная инфа для PATCH', status=400)
 
         return HttpResponse('ok', status=200)
+
 
 # 3
 class GetData(View):
