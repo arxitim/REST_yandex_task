@@ -1,9 +1,10 @@
 from django.shortcuts import render
 from django.http import HttpResponse
+from django.core.exceptions import ValidationError
 from django.views import View
 from .models import Import
+from .validator import post_validate
 
-from pprint import pprint
 import json
 
 from django.views.decorators.csrf import csrf_exempt
@@ -19,7 +20,7 @@ class SaveImport(View):
 
     """
     def post(self, request):
-
+        """
         document = json.loads(request.body)
 
         # по-моему это бессмысленный кусок кода, но ТЗ есть ТЗ
@@ -30,6 +31,15 @@ class SaveImport(View):
 
         payload = Import.objects.create(value=data)
         return HttpResponse(payload.pk, status=200)
+        """
+        document = json.loads(request.body)
+
+        try:
+            post_validate(document)
+        except ValueError:
+            return HttpResponse("ОШИБКА ВАЛИДАЦИИ", status=400)
+
+        return HttpResponse(status=200)
 
 
 # 2
@@ -79,7 +89,7 @@ class ChangeData(View):
             # добавляем обратно в список жителей
             all_citizens.append(patch_citizen)
 
-            # ну и сохраняем обратно в базу
+            # сохраняем обратно в базу
             my_import.value = json.dumps({"data": all_citizens}, ensure_ascii=False, indent=4)
             my_import.save()
 
