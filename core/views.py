@@ -1,9 +1,8 @@
 from django.shortcuts import render
 from django.http import HttpResponse
-from django.core.exceptions import ValidationError
 from django.views import View
 from .models import Import
-from .validator import post_validate
+from .validator import post_validate, patch_validate
 
 import json
 
@@ -20,8 +19,11 @@ class SaveImport(View):
 
     """
     def post(self, request):
-        """
-        document = json.loads(request.body)
+        try:
+            document = json.loads(request.body)
+            post_validate(document)
+        except (TypeError, ValueError, json.JSONDecodeError) as exc:
+            return HttpResponse(exc.args[0], status=405)
 
         # по-моему это бессмысленный кусок кода, но ТЗ есть ТЗ
         document['data'] = document.pop('citizens')
@@ -31,15 +33,6 @@ class SaveImport(View):
 
         payload = Import.objects.create(value=data)
         return HttpResponse(payload.pk, status=200)
-        """
-        document = json.loads(request.body)
-
-        try:
-            post_validate(document)
-        except ValueError:
-            return HttpResponse("ОШИБКА ВАЛИДАЦИИ", status=400)
-
-        return HttpResponse(status=200)
 
 
 # 2
@@ -50,10 +43,12 @@ class ChangeData(View):
 
     """
     def patch(self, request, import_id, citizen_id):
-        patch_data = json.loads(request.body)
 
-        # берем нужный импорт
-        my_import = Import.objects.get(pk=import_id)
+        try:
+            # берем нужный импорт
+            my_import = Import.objects.get(pk=import_id)
+        except Import.DoesNotExist:
+            return HttpResponse('Такого импорта не существует')
 
         # из него берем нужных людей
         all_citizens = json.loads(my_import.value)['data']
@@ -64,37 +59,37 @@ class ChangeData(View):
         # собираемся его пропатчить
         patch_citizen = all_citizens.pop(all_citizens.index(citizen))
 
-        if (len(patch_data) == len(set(patch_data))) and set(patch_data).issubset({
-                                                                                    'name', 'gender', 'birth_date',
-                                                                                    'relatives', 'town',
-                                                                                    'street', 'building',
-                                                                                    'apartment'}):
-            # приступаем к патчингу
-            for key in patch_data:
-                if key == 'relatives':
+        try:
+            patch_data = json.loads(request.body)
+            patch_validate(patch_data)
+        except (json.JSONDecodeError, ValueError, TypeError) as exc:
+            return HttpResponse(exc.args[0], status=400)
 
-                    # удалить все существующие:
-                    for relative in patch_citizen['relatives']:
+
+        # приступаем к патчингу
+        for key in patch_data:
+            if key == 'relatives':
+
+                # удалить все существующие:
+                for relative in patch_citizen['relatives']:
+                    new_relative = next(x for x in all_citizens if x['citizen_id'] == relative)
+                    all_citizens[all_citizens.index(new_relative)][key].remove(citizen_id)
+
+                # если апдэйтнулись родственные связи
+                if patch_data[key]:
+                    for relative in patch_data[key]:
                         new_relative = next(x for x in all_citizens if x['citizen_id'] == relative)
-                        all_citizens[all_citizens.index(new_relative)][key].remove(citizen_id)
+                        all_citizens[all_citizens.index(new_relative)][key].append(citizen_id)
 
-                    # если апдэйтнулись родственные связи
-                    if patch_data[key]:
-                        for relative in patch_data[key]:
-                            new_relative = next(x for x in all_citizens if x['citizen_id'] == relative)
-                            all_citizens[all_citizens.index(new_relative)][key].append(citizen_id)
+            patch_citizen[key] = patch_data[key]
 
-                patch_citizen[key] = patch_data[key]
+        # добавляем обратно в список жителей
+        all_citizens.append(patch_citizen)
 
-            # добавляем обратно в список жителей
-            all_citizens.append(patch_citizen)
+        # сохраняем обратно в базу
+        my_import.value = json.dumps({"data": all_citizens}, ensure_ascii=False, indent=4)
+        my_import.save()
 
-            # сохраняем обратно в базу
-            my_import.value = json.dumps({"data": all_citizens}, ensure_ascii=False, indent=4)
-            my_import.save()
-
-        else:
-            return HttpResponse('Неверная инфа для PATCH', status=400)
 
         return HttpResponse('ok', status=200)
 

@@ -29,7 +29,7 @@ data = {"citizens": [{
     "building": "2",
     "apartment": 11,
     "name": "Романова Мария Леонидовна",
-    "birth_date": "23.11.1986",
+    "birth_date": "22.11.1986",
     "gender": "female",
     "relatives": []
 }
