@@ -7,11 +7,11 @@ data = {
     "street": "Льва Толстого",
     "building": "16к7стр5",
     "apartment": 7,
-    "relatives": [1]
+    "relatives": []
 }
 
 headers = {'Content-Type': 'application/json'}
-a = requests.patch('http://127.0.0.1:8000/imports/2/citizens/3', data=json.dumps(data, indent=4).encode('utf-8'), headers=headers)
+a = requests.patch('http://127.0.0.1:8000/imports/3/citizens/3', data=json.dumps(data, indent=4), headers=headers)
 
 print(a.status_code)
 print(a.text)

@@ -22,7 +22,7 @@ class SaveImport(View):
         try:
             document = json.loads(request.body)
             post_validate(document)
-        except (TypeError, ValueError, json.JSONDecodeError) as exc:
+        except (TypeError, ValueError, json.JSONDecodeError, IndexError, AttributeError) as exc:
             return HttpResponse(exc.args[0], status=405)
 
         # по-моему это бессмысленный кусок кода, но ТЗ есть ТЗ
@@ -62,13 +62,29 @@ class ChangeData(View):
         try:
             patch_data = json.loads(request.body)
             patch_validate(patch_data)
-        except (json.JSONDecodeError, ValueError, TypeError) as exc:
+        except (json.JSONDecodeError, ValueError, TypeError, IndexError, AttributeError) as exc:
             return HttpResponse(exc.args[0], status=400)
-
 
         # приступаем к патчингу
         for key in patch_data:
             if key == 'relatives':
+                # добавим пару проверок
+                if patch_data['relatives'] is None:
+                    return HttpResponse('Поле relatives не должно быть null')
+
+                if not all(isinstance(relative, int) for relative in patch_data['relatives']):
+                    return HttpResponse("Все элементы поля relative должны быть int", status=400)
+
+                if citizen_id in patch_data['relatives']:
+                    return HttpResponse('У жителя не может быть отношений с самим собой', status=400)
+
+                if len(set(patch_data['relatives'])) != len(patch_data['relatives']):
+                    return HttpResponse('В поле relatives не должно быть дубликатов')
+
+                citizens_ids = [id_relative['citizen_id'] for id_relative in all_citizens]
+                for relative in patch_data['relatives']:
+                    if relative not in citizens_ids:
+                        return HttpResponse('Отношений с данным id быть не может, так как его нет в данной выгрузке')
 
                 # удалить все существующие:
                 for relative in patch_citizen['relatives']:
@@ -89,7 +105,6 @@ class ChangeData(View):
         # сохраняем обратно в базу
         my_import.value = json.dumps({"data": all_citizens}, ensure_ascii=False, indent=4)
         my_import.save()
-
 
         return HttpResponse('ok', status=200)
 
