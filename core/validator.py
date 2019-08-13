@@ -43,6 +43,16 @@ def apartment_valid(apartment):
         raise ValueError("Номер квартиры должен быть целым числом")
 
 
+def duplicates_valid(data, name):
+    if len(data) != len(set(data)):
+        raise ValueError(f"{name} не уникален в рамках одной выгрузки")
+
+
+def ids_valid(data):
+    if not all(isinstance(_id, int) for _id in data) or [True for _id in data if _id <= 0]:
+        raise ValueError("Все элементы поля relative (все идентификаторы жителей) должны быть int > 0")
+
+
 def post_validate(data):
     """
     Универсальный валидатор для полей одного жителя
@@ -55,18 +65,13 @@ def post_validate(data):
 
     all_citizens = [citizen['citizen_id'] for citizen in data['citizens']]
 
-    if len(all_citizens) != len(set(all_citizens)):
-        raise ValueError("citizen_id не никален в рамках одной выгрузки")
+    duplicates_valid(all_citizens, 'citizen_id')
+    ids_valid(all_citizens)
 
     for citizen in data['citizens']:
-        if sorted(citizen.keys()) != ['apartment', 'birth_date', 'building', 'citizen_id',
-                                      'gender', 'name', 'relatives', 'street', 'town']:
-            raise ValueError("В полученных данных у одного или нескольких жителей нет всех необходимых полей")
 
-        if (int(citizen['citizen_id']) != float(citizen['citizen_id'])) or (int(citizen['citizen_id']) <= 0):
-            raise ValueError("citizen_id должен быть целым числом и больше чем ноль")
-
-        if citizen['relatives']:
+        if citizen['relatives'] is not None:
+            duplicates_valid(citizen['relatives'], 'relative')
             for relative in citizen['relatives']:
                 try:
                     person = next(x for x in data['citizens'] if x['citizen_id'] == relative)
@@ -74,10 +79,12 @@ def post_validate(data):
                     raise ValueError('Человек не может состоять в отношениях с человеком не из этой выгрузки')
 
                 if citizen['citizen_id'] not in person['relatives']:
-                    raise ValueError("Отношений у жителей в одной выгрузке должны быть двусторонними")
+                    raise ValueError("Отношения у жителей в одной выгрузке должны быть двусторонними")
 
                 if relative == citizen['citizen_id']:
                     raise ValueError('У человека не может быть взаимоотношений между самим собой')
+        else:
+            raise ValueError('Поле relatives не должно быть null')
 
         name_valid(citizen['name'].split())
 
@@ -96,7 +103,7 @@ def post_validate(data):
     return data
 
 
-def patch_validate(data):
+def patch_validate(data, citizen_id):
     """
     Валидатор для PATCH.
 
@@ -109,6 +116,17 @@ def patch_validate(data):
             or not set(data).issubset(fields) \
             or not data:
         raise ValueError('В запросе есть некорректные поля (или запрос оказался пустым)')
+
+    if 'relatives' in data:
+        if data['relatives'] is None:
+            raise ValueError('Поле relatives не должно быть null')
+
+        if citizen_id in data['relatives']:
+            raise ValueError('У жителя не может быть отношений с самим собой')
+
+        ids_valid(data['relatives'])
+
+        duplicates_valid(data['relatives'], 'relative')
 
     name_valid(data.get('name', "Иван Иванов").split())
 
@@ -124,4 +142,4 @@ def patch_validate(data):
 
     apartment_valid(data.get('apartment', 1))
 
-    # не валидируем поле relatives, из соображений производительности
+    # не валидируем поле relatives

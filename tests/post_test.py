@@ -36,7 +36,7 @@ data = {"citizens": [{
 ]
 }
 headers = {'Content-Type': 'application/json'}
-a = requests.post('http://127.0.0.1:8000/imports/', data=json.dumps(data, indent=4).encode('utf-8'), headers=headers)
+a = requests.post('http://127.0.0.1:8000/imports/', data=json.dumps(data), headers=headers)
 
 print(a.status_code)
 print(a.text)
