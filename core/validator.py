@@ -142,4 +142,4 @@ def patch_validate(data, citizen_id):
 
     apartment_valid(data.get('apartment', 1))
 
-    # не валидируем поле relatives
+    # не валидируем поле relatives, сделаем это во View

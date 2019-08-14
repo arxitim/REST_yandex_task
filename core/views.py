@@ -52,9 +52,14 @@ class ChangeData(View):
 
         # из него берем нужных людей
         all_citizens = json.loads(my_import.value)['data']
+        #  и их ids соответсвенно
+        citizens_ids = [_id['citizen_id'] for _id in all_citizens]
 
         # находим интересуещего нас жителя
-        citizen = next(x for x in all_citizens if x['citizen_id'] == citizen_id)
+        try:
+            citizen = next(x for x in all_citizens if x['citizen_id'] == citizen_id)
+        except StopIteration:
+            return HttpResponse(status=400)
 
         # собираемся его пропатчить
         patch_citizen = all_citizens.pop(all_citizens.index(citizen))
@@ -68,7 +73,6 @@ class ChangeData(View):
         # приступаем к патчингу
         for key in patch_data:
             if key == 'relatives':
-                citizens_ids = [_id['citizen_id'] for _id in all_citizens]
                 for relative in patch_data['relatives']:
                     if relative not in citizens_ids:
                         return HttpResponse('Отношений с данным id быть не может, так как его нет в данной выгрузке')
@@ -76,13 +80,13 @@ class ChangeData(View):
                 # удалить все существующие:
                 for relative in patch_citizen['relatives']:
                     new_relative = next(x for x in all_citizens if x['citizen_id'] == relative)
-                    all_citizens[all_citizens.index(new_relative)][key].remove(citizen_id)
+                    all_citizens[all_citizens.index(new_relative)]['relatives'].remove(citizen_id)
 
                 # если апдэйтнулись родственные связи
-                if patch_data[key]:
-                    for relative in patch_data[key]:
+                if patch_data['relatives']:
+                    for relative in patch_data['relatives']:
                         new_relative = next(x for x in all_citizens if x['citizen_id'] == relative)
-                        all_citizens[all_citizens.index(new_relative)][key].append(citizen_id)
+                        all_citizens[all_citizens.index(new_relative)]['relatives'].append(citizen_id)
 
             patch_citizen[key] = patch_data[key]
 
@@ -107,7 +111,7 @@ class GetData(View):
         try:
             data = Import.objects.get(pk=import_id).value
         except Import.DoesNotExist:
-            return HttpResponse(status=400, content='Импорта с таким номером не существует')
+            return HttpResponse('Импорта с таким номером не существует', status=400)
 
         return HttpResponse(data, content_type='application/json', status=200)
 
@@ -121,7 +125,39 @@ class GetPresents(View):
 
     # test
     def get(self, request, import_id):
-        return HttpResponse(f'Get presents data for {import_id}')
+        try:
+            data = Import.objects.get(pk=import_id).value
+            all_citizens = json.loads(data)['data']
+        except Import.DoesNotExist:
+            return HttpResponse('Импорта с таким номером не существует', status=400)
+
+        answer = {
+            "1": [], "2": [], "3": [], "4": [], "5": [], "6": [],
+            "7": [], "8": [], "9": [], "10": [], "11": [], "12": []
+        }
+
+
+        for citizen in all_citizens:
+            # вспомогательная структура
+            tmp_birthdays = dict()
+
+            for relative in citizen['relatives']:
+                target = next(x for x in all_citizens if x['citizen_id'] == relative)
+                birthday = target['birth_date'].split('.')[1]
+                if birthday[0] == '0':
+                    birthday = birthday[1]
+
+                if birthday not in tmp_birthdays:
+                    tmp_birthdays[birthday] = {'citizen_id': citizen['citizen_id'], 'presents': 1}
+                else:
+                    tmp_birthdays[birthday]['presents'] += 1
+
+            for month in tmp_birthdays:
+                answer[month].append(tmp_birthdays[month])
+
+        # EZ PZ LEMON SQUIZY
+        return HttpResponse(json.dumps(answer, ensure_ascii=False, indent=2),
+                                    content_type='application/json', status=200)
 
 
 class GetStats(View):
