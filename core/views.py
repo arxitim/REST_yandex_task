@@ -2,6 +2,8 @@ from django.http import HttpResponse
 from django.views import View
 from .models import Import
 from .validator import post_validate, patch_validate
+from datetime import date
+from numpy import percentile
 
 import json
 
@@ -168,7 +170,43 @@ class GetStats(View):
 
     # test
     def get(self, request, import_id):
-        return HttpResponse(f'Get stats data for {import_id}')
+
+        def calculate_age(born):
+            today = date.today()
+            return today.year - born.year - ((today.month, today.day) < (born.month, born.day))
+
+        try:
+            data = Import.objects.get(pk=import_id).value
+            all_citizens = json.loads(data)['data']
+        except Import.DoesNotExist:
+            return HttpResponse('Импорта с таким номером не существует', status=400)
+
+        ages = dict()
+
+        for citizen in all_citizens:
+
+            birth_date = date(*[int(value) for value in citizen['birth_date'].split('.')[::-1]])
+
+            if citizen['town'] not in ages:
+                ages[citizen['town']] = [calculate_age(birth_date)]
+            else:
+                ages[citizen['town']].append(calculate_age(birth_date))
+
+        answer = []
+        for town in ages:
+            stats = percentile(ages[town], q=[50, 75, 99], interpolation='linear')
+            answer.append({'town': town, 'p50': stats[0], 'p75': stats[1], 'p99': stats[2]})
+
+
+        return HttpResponse(json.dumps({"data": answer}, ensure_ascii=False, indent=2),
+                            content_type='application/json', status=200)
+
+
+
+
+
+
+
 
 
 class TestClass(View):
