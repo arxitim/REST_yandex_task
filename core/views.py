@@ -1,17 +1,16 @@
-from django.http import HttpResponse
-from django.views import View
-from .models import Import
-from .validator import post_validate, patch_validate
+import json
 from datetime import date
+
 from numpy import percentile
 
-import json
-
+from django.http import HttpResponse
+from django.views import View
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
+from .models import Import
+from .validator import post_validate, patch_validate
 
 
-# 1
 @method_decorator(csrf_exempt, name='dispatch')
 class SaveImport(View):
     """
@@ -23,21 +22,17 @@ class SaveImport(View):
         try:
             document = json.loads(request.body)
             post_validate(document)
-        except (TypeError, ValueError, KeyError, json.JSONDecodeError, IndexError, AttributeError) as exc:
+        except (json.JSONDecodeError, ValueError, TypeError,
+                IndexError, AttributeError, KeyError) as exc:
             return HttpResponse(exc.args[0], status=400)
 
-        # по-моему это бессмысленный кусок кода, но ТЗ есть ТЗ
-        document['data'] = document.pop('citizens')
-        # -----------------------------------------------------
-
-        data = json.dumps(document, indent=2, ensure_ascii=False)
-
+        data = json.dumps(document['citizens'], indent=2, ensure_ascii=False)
         payload = Import.objects.create(value=data)
+
         return HttpResponse(json.dumps({"data": {"import_id": payload.pk}}, indent=2),
                             content_type='application/json', status=201)
 
 
-# 2
 @method_decorator(csrf_exempt, name='dispatch')
 class ChangeData(View):
     """
@@ -47,44 +42,40 @@ class ChangeData(View):
     def patch(self, request, import_id, citizen_id):
 
         try:
-            # берем нужный импорт
             my_import = Import.objects.get(pk=import_id)
         except Import.DoesNotExist:
             return HttpResponse('Такого импорта не существует')
 
-        # из него берем нужных людей
-        all_citizens = json.loads(my_import.value)['data']
-        #  и их ids соответсвенно
+        all_citizens = json.loads(my_import.value)
         citizens_ids = [_id['citizen_id'] for _id in all_citizens]
 
-        # находим интересуещего нас жителя
         try:
+            #  we find the person we're interested in
             citizen = next(x for x in all_citizens if x['citizen_id'] == citizen_id)
         except StopIteration:
-            return HttpResponse(status=400)
+            return HttpResponse("Жителя с таким id нет в данной выгрузке", status=400)
 
-        # собираемся его пропатчить
         patch_citizen = all_citizens.pop(all_citizens.index(citizen))
 
         try:
             patch_data = json.loads(request.body)
             patch_validate(patch_data, citizen_id)
-        except (json.JSONDecodeError, ValueError, TypeError, IndexError, AttributeError, KeyError) as exc:
+        except (json.JSONDecodeError, ValueError, TypeError,
+                IndexError, AttributeError, KeyError) as exc:
             return HttpResponse(exc.args[0], status=400)
 
-        # приступаем к патчингу
         for key in patch_data:
             if key == 'relatives':
                 for relative in patch_data['relatives']:
                     if relative not in citizens_ids:
                         return HttpResponse('Отношений с данным id быть не может, так как его нет в данной выгрузке')
 
-                # удалить все существующие:
+                # we're deleting all existing relativess
                 for relative in patch_citizen['relatives']:
                     new_relative = next(x for x in all_citizens if x['citizen_id'] == relative)
                     all_citizens[all_citizens.index(new_relative)]['relatives'].remove(citizen_id)
 
-                # если апдэйтнулись родственные связи
+                # in case of an update of relatives
                 if patch_data['relatives']:
                     for relative in patch_data['relatives']:
                         new_relative = next(x for x in all_citizens if x['citizen_id'] == relative)
@@ -92,18 +83,15 @@ class ChangeData(View):
 
             patch_citizen[key] = patch_data[key]
 
-        # добавляем обратно в список жителей
         all_citizens.append(patch_citizen)
 
-        # сохраняем обратно в базу
-        my_import.value = json.dumps({"data": all_citizens}, ensure_ascii=False, indent=2)
+        my_import.value = json.dumps(all_citizens, ensure_ascii=False, indent=2)
         my_import.save()
 
         return HttpResponse(json.dumps({"data": patch_citizen}, ensure_ascii=False, indent=2),
                             content_type='application/json', status=200)
 
 
-# 3
 class GetData(View):
     """
     Returns the list of citizens for the specified data set.
@@ -111,11 +99,12 @@ class GetData(View):
     """
     def get(self, request, import_id):
         try:
-            data = Import.objects.get(pk=import_id).value
+            data = json.loads(Import.objects.get(pk=import_id).value)
         except Import.DoesNotExist:
             return HttpResponse('Импорта с таким номером не существует', status=400)
 
-        return HttpResponse(data, content_type='application/json', status=200)
+        return HttpResponse(json.dumps({"data": data}, ensure_ascii=False, indent=2),
+                            content_type='application/json', status=200)
 
 
 class GetPresents(View):
@@ -124,23 +113,16 @@ class GetPresents(View):
     The answer is grouped by months from the specified data set.
 
     """
-
-    # test
     def get(self, request, import_id):
         try:
             data = Import.objects.get(pk=import_id).value
-            all_citizens = json.loads(data)['data']
+            all_citizens = json.loads(data)
         except Import.DoesNotExist:
             return HttpResponse('Импорта с таким номером не существует', status=400)
 
-        answer = {
-            "1": [], "2": [], "3": [], "4": [], "5": [], "6": [],
-            "7": [], "8": [], "9": [], "10": [], "11": [], "12": []
-        }
-
+        answer = {str(month): [] for month in range(1, 13)}
 
         for citizen in all_citizens:
-            # вспомогательная структура
             tmp_birthdays = dict()
 
             for relative in citizen['relatives']:
@@ -157,9 +139,8 @@ class GetPresents(View):
             for month in tmp_birthdays:
                 answer[month].append(tmp_birthdays[month])
 
-        # EZ PZ LEMON SQUIZY
         return HttpResponse(json.dumps(answer, ensure_ascii=False, indent=2),
-                                    content_type='application/json', status=200)
+                            content_type='application/json', status=200)
 
 
 class GetStats(View):
@@ -167,8 +148,6 @@ class GetStats(View):
     Returns the statistics by city for the data set by age of citizens.
 
     """
-
-    # test
     def get(self, request, import_id):
 
         def calculate_age(born):
@@ -177,15 +156,14 @@ class GetStats(View):
 
         try:
             data = Import.objects.get(pk=import_id).value
-            all_citizens = json.loads(data)['data']
+            all_citizens = json.loads(data)
         except Import.DoesNotExist:
             return HttpResponse('Импорта с таким номером не существует', status=400)
 
         ages = dict()
-
         for citizen in all_citizens:
-
-            birth_date = date(*[int(value) for value in citizen['birth_date'].split('.')[::-1]])
+            valid_birth_date = citizen['birth_date'].split('.')[::-1]
+            birth_date = date(*[int(value) for value in valid_birth_date])
 
             if citizen['town'] not in ages:
                 ages[citizen['town']] = [calculate_age(birth_date)]
@@ -197,25 +175,5 @@ class GetStats(View):
             stats = percentile(ages[town], q=[50, 75, 99], interpolation='linear')
             answer.append({'town': town, 'p50': stats[0], 'p75': stats[1], 'p99': stats[2]})
 
-
         return HttpResponse(json.dumps({"data": answer}, ensure_ascii=False, indent=2),
                             content_type='application/json', status=200)
-
-
-
-
-
-
-
-
-
-class TestClass(View):
-    def get(self, request, item_id):
-
-        try:
-            data = Import.objects.get(pk=item_id).value
-
-        except Import.DoesNotExist:
-            return HttpResponse(status=400, content='Импорта с таким номером не существует')
-
-        return HttpResponse(data, content_type='application/json')

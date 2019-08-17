@@ -15,7 +15,7 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path, include
-from core.views import SaveImport, ChangeData, GetData, GetPresents, GetStats, TestClass
+from core.views import SaveImport, ChangeData, GetData, GetPresents, GetStats
 
 
 urlpatterns = [
@@ -27,6 +27,5 @@ urlpatterns = [
                     path('citizens', GetData.as_view()),
                     path('citizens/birthdays', GetPresents.as_view()),
                     path('towns/stat/percentile/age', GetStats.as_view()),
-            ])),
-    path('test_url/<int:item_id>', TestClass.as_view())
+            ]))
 ]
