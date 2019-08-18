@@ -7,7 +7,7 @@ data = {
     "street": "Льва Толстого",
     "building": "16к7стр5",
     "apartment": 7,
-    "relatives": [1]
+    "relatives": [4]
 }
 
 headers = {'Content-Type': 'application/json'}

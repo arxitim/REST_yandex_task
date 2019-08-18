@@ -1,8 +1,9 @@
 from datetime import date
+from string import punctuation
 
 
 def name_valid(name):
-    if len(name) < 2:
+    if len(name) < 2 or len(name) > 3:
         raise ValueError("Неверный формат записи имени")
     for word in name:
         if not word.isalpha():
@@ -24,23 +25,38 @@ def birth_date_valid(birth_date):
 
 
 def town_valid(town):
-    if not (town.isalpha() or town.isdigit()):
+    if not isinstance(town, str):
+        raise ValueError('Название города должно быть строкой')
+    if not (town[0].isalpha() or town[0].isdigit()):
         raise ValueError("Город должна состоять миниму из одной цифры или буквы")
+    for char in town:
+        if (char in punctuation) and char != '-':
+            raise ValueError("Название города не может содержать знаки пунктуации")
 
 
 def street_valid(street):
-    if not (street.isalpha() or street.isdigit()):
+    if not isinstance(street, str):
+        raise ValueError('Название улицы должно быть строкой')
+    if not (street[0].isalpha() or street[0].isdigit()):
         raise ValueError("Улица должна состоять миниму из одной цифры или буквы")
+    for char in street:
+        if (char in punctuation) and char not in ['-', '/']:
+            raise ValueError("Название улицы не может содержать знаки пунктуации")
 
 
 def building_valid(building):
-    if not (building.isalpha() or building.isdigit()):
+    if not isinstance(building, str):
+        raise ValueError('Название улицы должно быть строкой')
+    if not (building[0].isalpha() or building[0].isdigit()):
         raise ValueError("Адрес должна состоять миниму из одной цифры или буквы")
+    for char in building:
+        if (char in punctuation) and char not in ['-', '/', '.', ',']:
+            raise ValueError("Название улицы не может содержать знаки пунктуации")
 
 
 def apartment_valid(apartment):
     if (int(apartment) != float(apartment)) or (int(apartment) <= 0):
-        raise ValueError("Номер квартиры должен быть целым числом")
+        raise ValueError("Номер квартиры должен быть целым числом > 0")
 
 
 def duplicates_valid(data, name):
@@ -92,11 +108,11 @@ def post_validate(data):
 
         birth_date_valid(citizen['birth_date'].split('.'))
 
-        town_valid(citizen['town'][0])
+        town_valid(citizen['town'])
 
-        street_valid(citizen['street'][0])
+        street_valid(citizen['street'])
 
-        building_valid(citizen['building'][0])
+        building_valid(citizen['building'])
 
         apartment_valid(citizen['apartment'])
 
@@ -112,9 +128,7 @@ def patch_validate(data, citizen_id):
     """
     fields = {'name', 'gender', 'birth_date', 'relatives', 'town', 'street', 'building', 'apartment'}
 
-    if (len(data) > len(set(data)))\
-            or not set(data).issubset(fields) \
-            or not data:
+    if not set(data).issubset(fields) or not data:
         raise ValueError('В запросе есть некорректные поля (или запрос оказался пустым)')
 
     if 'relatives' in data:
@@ -134,11 +148,11 @@ def patch_validate(data, citizen_id):
 
     birth_date_valid(data.get('birth_date', '23.11.1986').split('.'))
 
-    town_valid(data.get('town', 'Москва')[0])
+    town_valid(data.get('town', 'Москва'))
 
-    street_valid(data.get('street', 'Иосифа Бродского')[0])
+    street_valid(data.get('street', 'Иосифа Бродского'))
 
-    building_valid(data.get('building', '1')[0])
+    building_valid(data.get('building', '1'))
 
     apartment_valid(data.get('apartment', 1))
 

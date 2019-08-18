@@ -68,7 +68,8 @@ class ChangeData(View):
             if key == 'relatives':
                 for relative in patch_data['relatives']:
                     if relative not in citizens_ids:
-                        return HttpResponse('Отношений с данным id быть не может, так как его нет в данной выгрузке')
+                        return HttpResponse('Отношений с данным id быть не может, \
+                         так как его нет в данной выгрузке', status=400)
 
                 # we're deleting all existing relativess
                 for relative in patch_citizen['relatives']:
@@ -99,12 +100,11 @@ class GetData(View):
     """
     def get(self, request, import_id):
         try:
-            data = json.loads(Import.objects.get(pk=import_id).value)
+            data = Import.objects.get(pk=import_id).value
         except Import.DoesNotExist:
             return HttpResponse('Импорта с таким номером не существует', status=400)
 
-        return HttpResponse(json.dumps({"data": data}, ensure_ascii=False, indent=2),
-                            content_type='application/json', status=200)
+        return HttpResponse(data, content_type='application/json', status=200)
 
 
 class GetPresents(View):
@@ -139,7 +139,7 @@ class GetPresents(View):
             for month in tmp_birthdays:
                 answer[month].append(tmp_birthdays[month])
 
-        return HttpResponse(json.dumps(answer, ensure_ascii=False, indent=2),
+        return HttpResponse(json.dumps({"data": answer}, ensure_ascii=False, indent=2),
                             content_type='application/json', status=200)
 
 
