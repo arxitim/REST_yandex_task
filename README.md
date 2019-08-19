@@ -3,13 +3,11 @@ This is my result of work on the REST API project, as part of the work for the s
 
 
 ### INSTALLING:
-
 source REST_yandex/env/bin/activate   {or equivalent}
 
 pip install -r requirements.txt
 
 ### LAUNCH TESTS:
-
 python manage.py test tests/
 
 ### STARTING THE SERVER:
@@ -20,8 +18,6 @@ gunicorn --workers 3 --threads 3 --bind 0.0.0.0:8080 yandex_task_arxit.wsgi
 
 
 ### CLEAR THE DATABASE:
-
 python manage.py migrate core zero
 
 python manage.py migrate
-
