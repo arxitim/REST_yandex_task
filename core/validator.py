@@ -2,7 +2,11 @@ from datetime import date
 from string import punctuation
 
 
+FIELDS = {'name', 'gender', 'birth_date', 'relatives', 'town', 'street', 'building', 'apartment'}
+
+
 def name_valid(name):
+    name = name.split()
     if len(name) < 2 or len(name) > 3:
         raise ValueError("Неверный формат записи имени")
     for word in name:
@@ -16,6 +20,7 @@ def gender_valid(gender):
 
 
 def birth_date_valid(birth_date):
+    birth_date = birth_date.split('.')
     if len(birth_date) != 3:
         raise ValueError("Неверный формат записи даты")
     try:
@@ -59,6 +64,22 @@ def apartment_valid(apartment):
         raise ValueError("Номер квартиры должен быть целым числом > 0")
 
 
+def other_fields_valid(data):
+    """
+    All fields are validated here except 'citizen_id', 'relatives'
+
+    :type data: dict
+    :rtype: None
+    """
+    for field in data:
+        if field in ['relatives', 'citizen_id']:
+            continue
+
+        # earlier we have checked that the value which gets in "eval" is a subset of "safe" words
+        validator = eval(field + '_valid')
+        validator(data[field])
+
+
 def duplicates_valid(data, name):
     if len(data) != len(set(data)):
         raise ValueError(f"{name} не уникален в рамках одной выгрузки")
@@ -71,9 +92,10 @@ def ids_valid(data):
 
 def post_validate(data):
     """
-    Универсальный валидатор для полей одного жителя
+    Validator for POST request.
 
-    На вход подается python-object
+    :type data: dict
+    :rtype: None
     """
 
     if (len(data) != 1) or ('citizens' not in data):
@@ -85,6 +107,8 @@ def post_validate(data):
     ids_valid(all_citizens)
 
     for citizen in data['citizens']:
+        if not set(citizen).issubset(FIELDS | {'citizen_id'}):
+            raise ValueError('В запросе есть некорректные поля (или запрос оказался пустым)')
 
         if citizen['relatives'] is not None:
             duplicates_valid(citizen['relatives'], 'relative')
@@ -102,33 +126,19 @@ def post_validate(data):
         else:
             raise ValueError('Поле relatives не должно быть null')
 
-        name_valid(citizen['name'].split())
-
-        gender_valid(citizen['gender'])
-
-        birth_date_valid(citizen['birth_date'].split('.'))
-
-        town_valid(citizen['town'])
-
-        street_valid(citizen['street'])
-
-        building_valid(citizen['building'])
-
-        apartment_valid(citizen['apartment'])
-
-    return data
+        other_fields_valid(citizen)
 
 
 def patch_validate(data, citizen_id):
     """
-    Валидатор для PATCH.
+    Validator for PATCH request.
 
-    Принимает на вход python-object
-
+    :type data: dict
+    :type citizen_id: int
+    :rtype: None
     """
-    fields = {'name', 'gender', 'birth_date', 'relatives', 'town', 'street', 'building', 'apartment'}
 
-    if not set(data).issubset(fields) or not data:
+    if not set(data).issubset(FIELDS) or not data:
         raise ValueError('В запросе есть некорректные поля (или запрос оказался пустым)')
 
     if 'relatives' in data:
@@ -139,21 +149,6 @@ def patch_validate(data, citizen_id):
             raise ValueError('У жителя не может быть отношений с самим собой')
 
         ids_valid(data['relatives'])
-
         duplicates_valid(data['relatives'], 'relative')
 
-    name_valid(data.get('name', "Иван Иванов").split())
-
-    gender_valid(data.get('gender', 'male'))
-
-    birth_date_valid(data.get('birth_date', '23.11.1986').split('.'))
-
-    town_valid(data.get('town', 'Москва'))
-
-    street_valid(data.get('street', 'Иосифа Бродского'))
-
-    building_valid(data.get('building', '1'))
-
-    apartment_valid(data.get('apartment', 1))
-
-    # не валидируем поле relatives, сделаем это во View
+    other_fields_valid(data)

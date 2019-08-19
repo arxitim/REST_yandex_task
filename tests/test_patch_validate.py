@@ -61,11 +61,6 @@ class PatchTest(TestCase):
                               content_type='application/json')
         self.assertEqual(a.status_code, 200)
 
-    def test_its_ok_2(self):
-        a = self.client.patch(path='/imports/1/citizens/3', data=json.dumps(self.data, ensure_ascii=False),
-                              content_type='application/json')
-        self.assertEqual(a.status_code, 200)
-
     def test_wrong_format_1(self):
         a = self.client.patch(path='/imports/1/citizens/3', data=json.dumps({"citizens": None}, ensure_ascii=False),
                               content_type='application/json')

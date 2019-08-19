@@ -40,11 +40,10 @@ class ChangeData(View):
 
     """
     def patch(self, request, import_id, citizen_id):
-
         try:
             my_import = Import.objects.get(pk=import_id)
         except Import.DoesNotExist:
-            return HttpResponse('Такого импорта не существует')
+            return HttpResponse('Такого импорта не существует', status=400)
 
         all_citizens = json.loads(my_import.value)
         citizens_ids = [_id['citizen_id'] for _id in all_citizens]
@@ -127,7 +126,7 @@ class GetPresents(View):
 
             for relative in citizen['relatives']:
                 target = next(x for x in all_citizens if x['citizen_id'] == relative)
-                birthday = target['birth_date'].split('.')[1]
+                birthday = target['birth_date'].split('.')[1]    # we need only a month
                 if birthday[0] == '0':
                     birthday = birthday[1]
 
