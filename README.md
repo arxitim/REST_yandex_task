@@ -11,9 +11,11 @@ pip install -r requirements.txt
 python manage.py test tests/
 
 ### STARTING THE SERVER:
-(NB): csrf protection off, be careful.
-
+###### (NB): csrf protection off, be careful.
 python manage.py runserver 0.0.0.0:8080
+### STARTING THE SERVER WITH GUNICORN:
+gunicorn --workers 3 --threads 3 --bind 0.0.0.0:8080 yandex_task_arxit.wsgi
+
 
 ### CLEAR THE DATABASE:
 
