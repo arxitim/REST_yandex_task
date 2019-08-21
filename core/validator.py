@@ -107,7 +107,11 @@ def post_validate(data):
     ids_valid(all_citizens)
 
     for citizen in data['citizens']:
-        if not set(citizen).issubset(FIELDS | {'citizen_id'}):
+        if 'appartement' in citizen:
+            citizen['apartment'] = citizen['appartement']
+            del citizen['appartement']
+
+        if (FIELDS | {'citizen_id'}) != set(citizen.keys()):
             raise ValueError('В запросе есть некорректные поля (или запрос оказался пустым)')
 
         if citizen['relatives'] is not None:
@@ -137,6 +141,9 @@ def patch_validate(data, citizen_id):
     :type citizen_id: int
     :rtype: None
     """
+    if 'appartement' in data:
+        data['apartment'] = data['appartement']
+        del data['appartement']
 
     if not set(data).issubset(FIELDS) or not data:
         raise ValueError('В запросе есть некорректные поля (или запрос оказался пустым)')
