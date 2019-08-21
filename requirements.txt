@@ -1,7 +1,9 @@
 certifi==2019.6.16
 chardet==3.0.4
 Django==2.2.4
+gunicorn==19.9.0
 idna==2.8
+numpy==1.17.0
 pkg-resources==0.0.0
 pytz==2019.2
 requests==2.22.0
