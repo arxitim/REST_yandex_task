@@ -20,7 +20,7 @@ class SaveImport(View):
     """
     def post(self, request):
         try:
-            document = json.loads(request.body.decode('UTF-8'))
+            document = json.loads(request.body)
             post_validate(document)
         except (json.JSONDecodeError, ValueError, TypeError,
                 IndexError, AttributeError, KeyError) as exc:
