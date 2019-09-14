@@ -1,6 +1,3 @@
-# REST_yandex
-This is my result of work on the REST API project, as part of the work for the second stage of selection to the backend development school in Yandex.
-
 
 ### INSTALLING:
 source REST_yandex/env/bin/activate   {or equivalent}
